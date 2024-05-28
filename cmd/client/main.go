@@ -3,9 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"sjohn/Peril/internal/gamelogic"
-	"sjohn/Peril/internal/helpers"
 	"sjohn/Peril/internal/pubsub"
 	"sjohn/Peril/internal/routing"
 
@@ -33,5 +31,44 @@ func main() {
 		pubsub.Transient,
 	)
 
-	helpers.BlockUntilSignal(os.Interrupt)
+	gameState := gamelogic.NewGameState(username)
+repl:
+	for true {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+
+		switch words[0] {
+		case "spawn":
+			err := gameState.CommandSpawn(words)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+		case "move":
+			move, err := gameState.CommandMove(words)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			fmt.Printf("moved to: %s by player: %s of %v unit(s) successful\n",
+				move.ToLocation,
+				move.Player.Username,
+				len(move.Units),
+			)
+		case "status":
+			gameState.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			break repl
+		default:
+			log.Printf("didn't recognize command %s", words[0])
+		}
+	}
 }
