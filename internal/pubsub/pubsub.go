@@ -24,15 +24,6 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 	return nil
 }
 
-// Create a new .Channel() on the connection.
-// Declare a new queue using .QueueDeclare():
-// The durable parameter should only be true if simpleQueueType is durable.
-// The autoDelete parameter should be true if simpleQueueType is transient.
-// The exclusive parameter should be true if simpleQueueType is transient.
-// The noWait parameter should be false.
-// The args parameter should be nil.
-// Bind the queue to the exchange using .QueueBind().
-// Return the channel and queue.
 func DeclareAndBind(
 	conn *amqp.Connection,
 	exchange,
@@ -61,12 +52,12 @@ func createQueueType(queueName string, connCh *amqp.Channel, simpleQueueType int
 	var durable, autoDelete, exclusive bool
 	switch simpleQueueType {
 	// durable
-	case 1:
+	case Durable:
 		durable = true
 		autoDelete = false
 		exclusive = false
 		// transient
-	case 2:
+	case Transient:
 		durable = false
 		autoDelete = true
 		exclusive = true

@@ -20,12 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	fmt.Println("Connection was successful...")
-	// connChan, err := conn.Channel()
-	// if err != nil {
-	// 	log.Fatalln(err)
-	// }
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
@@ -38,5 +33,5 @@ func main() {
 		pubsub.Transient,
 	)
 
-	helpers.blockUntilSignal(os.Interrupt)
+	helpers.BlockUntilSignal(os.Interrupt)
 }
