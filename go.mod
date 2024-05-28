@@ -1,4 +1,4 @@
-module github.com/bootdotdev/learn-pub-sub-starter
+module sjohn/Peril
 
 go 1.22.1
 

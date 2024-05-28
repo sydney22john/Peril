@@ -5,9 +5,10 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sjohn/Peril/internal/helpers"
+	"sjohn/Peril/internal/pubsub"
+	"sjohn/Peril/internal/routing"
 
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -32,13 +33,6 @@ func main() {
 	})
 
 	// wait for ctrl+c
-	blockUntilSignal(os.Interrupt)
+	helpers.BlockUntilSignal(os.Interrupt)
 	fmt.Println("The program is shutting down. Connection is being closed.")
-}
-
-func blockUntilSignal(sig os.Signal) {
-	// wait for signal
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, sig)
-	<-signalChan
 }
