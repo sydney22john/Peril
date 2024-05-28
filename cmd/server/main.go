@@ -27,12 +27,15 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.Durable)
+
 	gamelogic.PrintServerHelp()
 	handleErr := func(err error) {
 		if err != nil {
 			log.Println(err)
 		}
 	}
+
 repl:
 	for true {
 		words := gamelogic.GetInput()
