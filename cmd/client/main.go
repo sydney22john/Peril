@@ -36,10 +36,37 @@ func main() {
 
 	gameState := gamelogic.NewGameState(username)
 
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, routing.PauseKey+"."+username, routing.PauseKey, pubsub.Transient, handlerPause(gameState))
+	// subscribing to the pause/resume game queue
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilDirect,
+		routing.PauseKey+"."+username,
+		routing.PauseKey,
+		pubsub.Transient,
+		handlerPause(gameState),
+	)
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	// declaring client specific queue for their moves
+	moveCh, _, err := pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.ArmyMovesPrefix+"."+username,
+		routing.ArmyMovesPrefix+".*",
+		pubsub.Transient,
+	)
+	// subscribing to the army_moves.* queues. Consumes messages from other players and itself
+	//func pubsub.SubscribeJSON(conn *amqp.Connection, exchange string, queueName string, key string, simpleQueueType pubsub.SimpleQueueType, handler func(gamelogic.ArmyMove)) error
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.ArmyMovesPrefix+"."+username,
+		routing.ArmyMovesPrefix+".*",
+		pubsub.Transient,
+		handlerMoves(gameState),
+	)
 
 repl:
 	for true {
@@ -62,10 +89,11 @@ repl:
 				continue
 			}
 
-			fmt.Printf("moved to: %s by player: %s of %v unit(s) successful\n",
-				move.ToLocation,
-				move.Player.Username,
-				len(move.Units),
+			pubsub.PublishJSON(
+				moveCh,
+				routing.ExchangePerilTopic,
+				routing.ArmyMovesPrefix+"."+username,
+				move,
 			)
 		case "status":
 			gameState.CommandStatus()
@@ -86,5 +114,12 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
 	return func(playingState routing.PlayingState) {
 		defer fmt.Print("> ")
 		gs.HandlePause(playingState)
+	}
+}
+
+func handlerMoves(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
+	return func(mo gamelogic.ArmyMove) {
+		defer fmt.Print("> ")
+		gs.HandleMove(mo)
 	}
 }

@@ -17,15 +17,10 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 		return err
 	}
 
-	err = ch.PublishWithContext(context.Background(), exchange, key, false, false, amqp.Publishing{
+	return ch.PublishWithContext(context.Background(), exchange, key, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        payload,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 /**
@@ -97,6 +92,7 @@ func SubscribeJSON[T any](
 	}
 
 	// deliveryCh is a 'consumer' for queueName.
+	// leaving consumer argument as "" so that it is randomly assigned a unique name
 	deliveryCh, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return err
@@ -104,6 +100,7 @@ func SubscribeJSON[T any](
 
 	// handling each message from 'queueName'
 	go func() {
+		defer ch.Close()
 		for msg := range deliveryCh {
 			var data T
 			err = json.Unmarshal(msg.Body, &data)
