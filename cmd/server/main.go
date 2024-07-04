@@ -27,7 +27,13 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.Durable)
+	// declaring a durable queue with the name routing.GameLogSlug
+	// and key of routing.GameLogSlug.* to 'peril_direct' exchange
+	pubsub.DeclareAndBind(conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		routing.GameLogSlug+".*",
+		pubsub.Durable)
 
 	gamelogic.PrintServerHelp()
 	handleErr := func(err error) {

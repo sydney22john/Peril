@@ -24,14 +24,23 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	pubsub.DeclareAndBind(conn,
+	_, _, err = pubsub.DeclareAndBind(conn,
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+username,
 		routing.PauseKey,
 		pubsub.Transient,
 	)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	gameState := gamelogic.NewGameState(username)
+
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, routing.PauseKey+"."+username, routing.PauseKey, pubsub.Transient, handlerPause(gameState))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 repl:
 	for true {
 		words := gamelogic.GetInput()
@@ -70,5 +79,12 @@ repl:
 		default:
 			log.Printf("didn't recognize command %s", words[0])
 		}
+	}
+}
+
+func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
+	return func(playingState routing.PlayingState) {
+		defer fmt.Print("> ")
+		gs.HandlePause(playingState)
 	}
 }
