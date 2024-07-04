@@ -13,25 +13,22 @@ import (
 func main() {
 	fmt.Println("Starting Peril client...")
 	rabbitMQconn := "amqp://guest:guest@localhost:5672/"
+
 	conn, err := amqp.Dial(rabbitMQconn)
-	defer conn.Close()
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("couldn't connect to rabbitMQ: %v", err)
 	}
+	defer conn.Close()
 	fmt.Println("Connection was successful...")
+
+	publishCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("couldn't open channel: %v", err)
+	}
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
-		log.Fatalln(err)
-	}
-	_, _, err = pubsub.DeclareAndBind(conn,
-		routing.ExchangePerilDirect,
-		routing.PauseKey+"."+username,
-		routing.PauseKey,
-		pubsub.Transient,
-	)
-	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("couldn't get username: %v", err)
 	}
 
 	gameState := gamelogic.NewGameState(username)
@@ -40,33 +37,27 @@ func main() {
 	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
-		routing.PauseKey+"."+username,
+		routing.PauseKey+"."+gameState.GetUsername(),
 		routing.PauseKey,
 		pubsub.Transient,
 		handlerPause(gameState),
 	)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("couldn't subscribe to pause: %v", err)
 	}
 
-	// declaring client specific queue for their moves
-	moveCh, _, err := pubsub.DeclareAndBind(
-		conn,
-		routing.ExchangePerilTopic,
-		routing.ArmyMovesPrefix+"."+username,
-		routing.ArmyMovesPrefix+".*",
-		pubsub.Transient,
-	)
 	// subscribing to the army_moves.* queues. Consumes messages from other players and itself
-	//func pubsub.SubscribeJSON(conn *amqp.Connection, exchange string, queueName string, key string, simpleQueueType pubsub.SimpleQueueType, handler func(gamelogic.ArmyMove)) error
 	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilTopic,
-		routing.ArmyMovesPrefix+"."+username,
+		routing.ArmyMovesPrefix+"."+gameState.GetUsername(),
 		routing.ArmyMovesPrefix+".*",
 		pubsub.Transient,
 		handlerMoves(gameState),
 	)
+	if err != nil {
+		log.Fatalf("couldn't subscribe to moves: %v", err)
+	}
 
 repl:
 	for true {
@@ -90,9 +81,9 @@ repl:
 			}
 
 			pubsub.PublishJSON(
-				moveCh,
+				publishCh,
 				routing.ExchangePerilTopic,
-				routing.ArmyMovesPrefix+"."+username,
+				routing.ArmyMovesPrefix+"."+gameState.GetUsername(),
 				move,
 			)
 		case "status":
@@ -107,19 +98,5 @@ repl:
 		default:
 			log.Printf("didn't recognize command %s", words[0])
 		}
-	}
-}
-
-func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
-	return func(playingState routing.PlayingState) {
-		defer fmt.Print("> ")
-		gs.HandlePause(playingState)
-	}
-}
-
-func handlerMoves(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
-	return func(mo gamelogic.ArmyMove) {
-		defer fmt.Print("> ")
-		gs.HandleMove(mo)
 	}
 }
