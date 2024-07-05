@@ -83,7 +83,7 @@ func SubscribeJSON[T any](
 	queueName,
 	key string,
 	simpleQueueType SimpleQueueType,
-	handler func(T),
+	handler func(T) AckType,
 ) error {
 	// declaring and binding the queueName to an exchange or ensuring that the queue exists
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
@@ -108,9 +108,16 @@ func SubscribeJSON[T any](
 				log.Println(err)
 			}
 
-			handler(data)
+			ackType := handler(data)
 
-			msg.Ack(false)
+			switch ackType {
+			case Ack:
+				msg.Ack(false)
+			case NackRequeue:
+				msg.Nack(false, true)
+			case NackDiscard:
+				msg.Nack(false, false)
+			}
 		}
 	}()
 	return nil
