@@ -15,13 +15,14 @@ func main() {
 	rabbitMQconn := "amqp://guest:guest@localhost:5672/"
 
 	conn, err := amqp.Dial(rabbitMQconn)
+	defer conn.Close()
 	if err != nil {
 		log.Fatalf("couldn't connect to rabbitMQ: %v", err)
 	}
-	defer conn.Close()
 	fmt.Println("Connection was successful...")
 
 	publishCh, err := conn.Channel()
+	defer publishCh.Close()
 	if err != nil {
 		log.Fatalf("couldn't open channel: %v", err)
 	}
@@ -34,7 +35,7 @@ func main() {
 	gameState := gamelogic.NewGameState(username)
 
 	// subscribing to the pause/resume game queue
-	err = pubsub.SubscribeJSON(
+	err = pubsub.DBSubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+gameState.GetUsername(),
@@ -47,16 +48,29 @@ func main() {
 	}
 
 	// subscribing to the army_moves.* queues. Consumes messages from other players and itself
-	err = pubsub.SubscribeJSON(
+	err = pubsub.DBSubscribeJSON(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.ArmyMovesPrefix+"."+gameState.GetUsername(),
 		routing.ArmyMovesPrefix+".*",
 		pubsub.Transient,
-		handlerMoves(gameState),
+		handlerMoves(gameState, publishCh),
 	)
 	if err != nil {
 		log.Fatalf("couldn't subscribe to moves: %v", err)
+	}
+
+	// subscribing to the war queue
+	err = pubsub.DBSubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".#",
+		pubsub.Durable,
+		handlerWar(gameState),
+	)
+	if err != nil {
+		log.Fatalf("couldn't subscrive to war: %v", err)
 	}
 
 repl:
@@ -83,7 +97,7 @@ repl:
 			pubsub.PublishJSON(
 				publishCh,
 				routing.ExchangePerilTopic,
-				routing.ArmyMovesPrefix+"."+gameState.GetUsername(),
+				routing.ArmyMovesPrefix+"."+move.Player.Username,
 				move,
 			)
 		case "status":
